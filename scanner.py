@@ -158,10 +158,16 @@ class CommandInjectionAnalyzer(BaseAnalyzer):
 class CodeEvaluationAnalyzer(BaseAnalyzer):
     """Eng: Detects the dangerous use of eval() and exec().
        Pt: Detecta o uso perigoso de eval() e exec()."""
-    risky_function_names = {'eval', 'exec', 'compile', '__import__'}  # MELHORIA: compile e __import__
+    risky_function_names = {'eval', 'exec', 'compile', '__import__'}  
     vulnerability_type = 'Code Injection'
     
-
+class LDAPInjectionAnalyzer(BaseAnalyzer):
+    """Eng: Defines and detects the risk functions for LDAP Injection.
+       Pt: Deteta vulnerabilidades de Injeção LDAP em consultas a deretórios"""
+    risky_function_names = {
+        'search', 'search_st','search_ext','search_ext_s',
+        'simple_bind_s', 'modify_s','FindAll','FindOne', 'FindeByIdentity'}
+    vulnerability_type = 'LDAP Injection'
 
 # ----------------------- ANALYSIS ----------------------------
 def analyze_file(file_path: str) -> List[Dict[str, Any]]:
@@ -249,6 +255,6 @@ if __name__ == "__main__":
     found_problems = analyze_file(file_to_analyze)
     show_results(found_problems, verbose=True)
     
-    # Exportar para JSON 
-    if found_problems:
-        export_json(found_problems)
+    # Exportar para JSON (opcional) 
+    #if found_problems:
+    #   export_json(found_problems)
