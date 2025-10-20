@@ -169,6 +169,20 @@ class LDAPInjectionAnalyzer(BaseAnalyzer):
         'simple_bind_s', 'modify_s','FindAll','FindOne', 'FindeByIdentity'}
     vulnerability_type = 'LDAP Injection'
 
+    def _has_safe_parameters(self, node: ast.Call) -> bool:
+        """
+        Eng: Checks if the call uses proper LDAP escaping functions. 
+        Pt: Verifica se a chamada usa funções de escape LDAP apropriadas.
+        """
+        for arg in node.args:
+         if isinstance(arg, ast.Call):
+            func_name = self._get_function_name(arg)
+
+            if func_name in {'escape_filter_chars', 'escape_dn_chars',
+                             'ldap_escape', 'sanitize_ldap'}:
+                return True
+        return False 
+        
 # ----------------------- ANALYSIS ----------------------------
 def analyze_file(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -194,7 +208,8 @@ def analyze_file(file_path: str) -> List[Dict[str, Any]]:
     analyzers = [
         SQLInjectionAnalyzer(),
         CommandInjectionAnalyzer(),
-        CodeEvaluationAnalyzer(), 
+        CodeEvaluationAnalyzer(),
+        LDAPInjectionAnalyzer(), 
     ]
 
     all_problems = []
