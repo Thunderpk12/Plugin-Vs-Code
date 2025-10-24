@@ -182,6 +182,29 @@ class LDAPInjectionAnalyzer(BaseAnalyzer):
                              'ldap_escape', 'sanitize_ldap'}:
                 return True
         return False 
+class NoSQLInjectionAnalyzer(BaseAnalyzer):
+    """
+    Eng: Detects NoSQL Injection vulnerabilities, especially in MongoDB.
+    Pt: Detecta vulnerabilidades de Injeção NoSQL, especialmente em MongoDB.
+    """
+    
+    risky_function_names = {'find', 'find_one', 'delete_one', 'update_one', 'aggregate'}
+    vulnerability_type = 'NoSQL Injection'
+
+    def visit_Call(self, node: ast.Call):
+        function_name = self._get_function_name(node)
+        if function_name in self.risky_function_names:
+            if node.args:
+                filter_arg = node.args[0]
+                # Perigoso: find({"$where": f"this.name == '{user_input}'"})
+                if isinstance(filter_arg, ast.Dict):
+                    for i, key in enumerate(filter_arg.keys):
+                        if isinstance(key, ast.Constant) and key.value == "$where":
+                            value_node = filter_arg.values[i]
+                            vulnerable_pattern = self._check_argument_for_injection(value_node)
+                            if vulnerable_pattern:
+                                return
+        self.generic_visit(node)
         
 # ----------------------- ANALYSIS ----------------------------
 def analyze_file(file_path: str) -> List[Dict[str, Any]]:
