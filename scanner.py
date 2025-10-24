@@ -270,6 +270,6 @@ if __name__ == "__main__":
     found_problems = analyze_file(file_to_analyze)
     show_results(found_problems, verbose=True)
     
-     
-    if found_problems:
-       export_json(found_problems)
+    # Exportar para JSON (opcional) 
+    #if found_problems:
+    #   export_json(found_problems)
