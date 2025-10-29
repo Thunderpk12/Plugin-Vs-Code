@@ -1,0 +1,162 @@
+[
+  {
+    "line": 34,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'execute'."
+  },
+  {
+    "line": 38,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "direct variable 'query' (unvalidated)",
+    "description": "Use of direct variable 'query' (unvalidated) in dangerous function 'execute'."
+  },
+  {
+    "line": 41,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "use of '.format()' with variables",
+    "description": "Use of use of '.format()' with variables in dangerous function 'execute'."
+  },
+  {
+    "line": 44,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "direct variable 'user_id' (unvalidated)",
+    "description": "Use of direct variable 'user_id' (unvalidated) in dangerous function 'execute'."
+  },
+  {
+    "line": 48,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "direct variable 'table_name' (unvalidated)",
+    "description": "Use of direct variable 'table_name' (unvalidated) in dangerous function 'execute'."
+  },
+  {
+    "line": 73,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "system",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'system'."
+  },
+  {
+    "line": 76,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "run",
+    "pattern": "direct variable 'filename' (unvalidated)",
+    "description": "Use of direct variable 'filename' (unvalidated) in dangerous function 'run'."
+  },
+  {
+    "line": 79,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "system",
+    "pattern": "direct variable 'user_command' (unvalidated)",
+    "description": "Use of direct variable 'user_command' (unvalidated) in dangerous function 'system'."
+  },
+  {
+    "line": 82,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "Popen",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'Popen'."
+  },
+  {
+    "line": 85,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "check_output",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'check_output'."
+  },
+  {
+    "line": 109,
+    "column": 13,
+    "type": "Code Injection",
+    "function": "eval",
+    "pattern": "direct variable 'user_code' (unvalidated)",
+    "description": "Use of direct variable 'user_code' (unvalidated) in dangerous function 'eval'."
+  },
+  {
+    "line": 112,
+    "column": 4,
+    "type": "Code Injection",
+    "function": "exec",
+    "pattern": "direct variable 'formula' (unvalidated)",
+    "description": "Use of direct variable 'formula' (unvalidated) in dangerous function 'exec'."
+  },
+  {
+    "line": 115,
+    "column": 11,
+    "type": "Code Injection",
+    "function": "eval",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'eval'."
+  },
+  {
+    "line": 118,
+    "column": 15,
+    "type": "Code Injection",
+    "function": "compile",
+    "pattern": "direct variable 'user_code' (unvalidated)",
+    "description": "Use of direct variable 'user_code' (unvalidated) in dangerous function 'compile'."
+  },
+  {
+    "line": 122,
+    "column": 4,
+    "type": "Code Injection",
+    "function": "__import__",
+    "pattern": "direct variable 'module_name' (unvalidated)",
+    "description": "Use of direct variable 'module_name' (unvalidated) in dangerous function '__import__'."
+  },
+  {
+    "line": 138,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'execute'."
+  },
+  {
+    "line": 141,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "system",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'system'."
+  },
+  {
+    "line": 144,
+    "column": 4,
+    "type": "Code Injection",
+    "function": "eval",
+    "pattern": "f-string with variables",
+    "description": "Use of f-string with variables in dangerous function 'eval'."
+  },
+  {
+    "line": 154,
+    "column": 4,
+    "type": "SQL Injection",
+    "function": "execute",
+    "pattern": "subscript access (dict/list indexing)",
+    "description": "Use of subscript access (dict/list indexing) in dangerous function 'execute'."
+  },
+  {
+    "line": 157,
+    "column": 4,
+    "type": "Command Injection",
+    "function": "system",
+    "pattern": "attribute access (object field)",
+    "description": "Use of attribute access (object field) in dangerous function 'system'."
+  }
+]
