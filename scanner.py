@@ -232,10 +232,7 @@ class TemplateInjectionAnalyzer(BaseAnalyzer):
     Eng: Detects Server-Side Template Injection (SSTI) in Jinja2, Django, etc.
     Pt: Detecta Injeção de Templates (SSTI) em Jinja2, Django, etc.
     
-    Exemplo perigoso:
-        template = Template(user_input)  # SSTI
-        render_template_string(user_input)  # SSTI
-    """
+  """
     risky_function_names = {
         'Template',  # Jinja2
         'render_template_string',  # Flask
@@ -290,9 +287,7 @@ class XMLInjectionAnalyzer(BaseAnalyzer):
     Eng: Detects XML External Entity (XXE) and XML Injection vulnerabilities.
     Pt: Detecta vulnerabilidades XXE e Injeção XML.
     
-    Exemplo perigoso:
-        parser = etree.XMLParser(resolve_entities=True)  # XXE
-        xml.etree.ElementTree.parse(user_file)  # Sem validação
+   
     """
     risky_function_names = {
         'parse',  # xml.etree / lxml
@@ -344,9 +339,6 @@ class HeaderInjectionAnalyzer(BaseAnalyzer):
     Eng: Detects HTTP Header Injection (CRLF Injection).
     Pt: Detecta Injeção de Cabeçalhos HTTP (CRLF Injection).
     
-    Exemplo perigoso:
-        response['Location'] = user_input  # Pode injetar \r\n
-        response.headers['X-Custom'] = f"{user_value}"
     """
     vulnerability_type = 'Header Injection (CRLF)'
 
