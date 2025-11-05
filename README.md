@@ -4,7 +4,7 @@ Plugin para Visual Studio Code (em desenvolvimento) que deteta vulnerabilidades 
 
 🎯 Objetivo
 
-Fornecer análise estática de segurança (SAST) diretamente no editor, focando-se primariamente em vulnerabilidades de Injeção (correspondentes à categoria OWASP A03:2021 - Injection).
+Análise estática de segurança focando em OWASP Top 10 (A03, A06, A09).
 
 ✨ Funcionalidades Principais
 
