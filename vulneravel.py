@@ -176,6 +176,5 @@ def log_vulnerable(user_name):
 
 
 if __name__ == "__main__":
-    # Este ficheiro deve ser executado com um servidor Flask
-    # ex: flask --app vulneravel run
+   
     app.run(debug=True)
