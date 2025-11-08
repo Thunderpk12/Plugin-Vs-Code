@@ -23,7 +23,7 @@ from injection_analyzer import (
     HeaderInjectionAnalyzer,
     LogInjectionAnalyzer,  
 )
-from logging_analyzer import LoggingMonitorAnalyzer  # Este é o A09 Logging Failure
+from logging_analyzer import EnhancedLoggingAnalyzer
 
 def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dict[str, Any]]:
     """
@@ -65,7 +65,7 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
     
     # A09: Analisadores de Falhas de Logging
     logging_analyzers = [
-        LoggingMonitorAnalyzer(), # A09
+       EnhancedLoggingAnalyzer(),
     ]
 
     all_analyzers = injection_analyzers + logging_analyzers

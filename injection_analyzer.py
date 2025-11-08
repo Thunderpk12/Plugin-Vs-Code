@@ -333,7 +333,7 @@ class HeaderInjectionAnalyzer(BaseInjectionAnalyzer):
             child._parent = node
         self.generic_visit(node)
 
-
+# Faz parte da A09 mas ainda é do tipo injection 
 class LogInjectionAnalyzer(BaseInjectionAnalyzer):
     risky_function_names = {'debug', 'info', 'warning', 'warn', 'error', 'critical', 'log', 'exception'}
     vulnerability_type = 'Log Injection'
