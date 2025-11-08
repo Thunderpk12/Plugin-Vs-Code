@@ -6,16 +6,23 @@ import ast
 from typing import List, Set, Dict, Optional
 from models import Vulnerability
 
-class EnhancedLoggingAnalyzer(ast.NodeVisitor):
+class LoggingAnalyzer(ast.NodeVisitor):
     """
-    Análise avançada de logging com:
+    Eng: Logging analysis with:
+    - Sensitive data detection in logs
+    - Appropriate log level checking
+    - Critical operation without audit detection
+    - Exception context analysis      
+    
+    
+    Pt: Análise de logging com:
     - Detecção de dados sensíveis em logs
     - Verificação de níveis de log apropriados
     - Detecção de operações críticas sem auditoria
     - Análise de contexto de exceções
     """
     
-    # Operações críticas que DEVEM ter logging
+    # Operações que devem ter logging
     CRITICAL_OPERATIONS = {
         'login', 'logout', 'authenticate', 'authorize', 'auth',
         'delete', 'remove', 'drop', 'truncate',
@@ -72,7 +79,10 @@ class EnhancedLoggingAnalyzer(ast.NodeVisitor):
         return ""
     
     def _extract_log_message(self, call_node: ast.Call) -> str:
-        """Extrai a mensagem de log de uma chamada"""
+        """
+        Eng: Extracts the log message from a call
+        Pt:Extrai a mensagem de log de uma chamada
+        """
         if call_node.args:
             arg = call_node.args[0]
             if isinstance(arg, ast.Constant):
@@ -92,7 +102,10 @@ class EnhancedLoggingAnalyzer(ast.NodeVisitor):
         return ""
     
     def _contains_sensitive_data(self, node: ast.AST) -> Optional[str]:
-        """Verifica se um nó contém dados sensíveis"""
+        """
+        Eng: Checks if a node contains sensitive data
+        Pt:Verifica se um nó contém dados sensíveis
+        """
         if isinstance(node, ast.Name):
             var_name = node.id.lower()
             for keyword in self.SENSITIVE_KEYWORDS:
@@ -123,7 +136,10 @@ class EnhancedLoggingAnalyzer(ast.NodeVisitor):
         return None
     
     def _get_log_level(self, func_name: str) -> Optional[str]:
-        """Extrai o nível de log da função"""
+        """
+        Eng: Extracts the log level from the function
+        pT:Extrai o nível de log da função
+        """
         func_lower = func_name.lower()
         if 'debug' in func_lower:
             return 'debug'
@@ -138,17 +154,26 @@ class EnhancedLoggingAnalyzer(ast.NodeVisitor):
         return None
     
     def _is_security_critical(self, func_name: str) -> bool:
-        """Verifica se a função é crítica de segurança"""
+        """
+        Eng: Checks if the function is security critical
+        Pt:Verifica se a função é crítica de segurança
+        """
         func_lower = func_name.lower()
         return any(op in func_lower for op in self.CRITICAL_OPERATIONS)
     
     def _is_data_modification(self, func_name: str) -> bool:
-        """Verifica se a função modifica dados"""
+        """
+        Eng: Verifica se a função modifica dados
+        Pt: Checks if the function modifies data
+        """
         func_lower = func_name.lower()
         return any(op in func_lower for op in self.WRITE_OPERATIONS)
     
     def _function_contains_logging(self, func_node: ast.FunctionDef) -> bool:
-        """Verifica se uma função contém logging"""
+        """
+        Eng: Checks if a function contains logging
+        Pt:Verifica se uma função contém logging
+        """
         for node in ast.walk(func_node):
             if isinstance(node, ast.Call):
                 func_name = self._get_full_name(node.func)
@@ -157,7 +182,10 @@ class EnhancedLoggingAnalyzer(ast.NodeVisitor):
         return False
     
     def _get_operation_type(self, func_name: str) -> Optional[str]:
-        """Determina o tipo de operação"""
+        """
+        Eng: Determines the type of operation
+        Pt:Determina o tipo de operação
+        """
         if self._is_security_critical(func_name):
             return 'critical_operation'
         elif self._is_data_modification(func_name):
@@ -275,12 +303,12 @@ class EnhancedLoggingAnalyzer(ast.NodeVisitor):
             if has_logging:
                 break
         
-        # Verificar falta de logging
+       
         is_pass = len(node.body) == 1 and isinstance(node.body[0], ast.Pass)
         is_raise = any(isinstance(child, ast.Raise) for child in node.body)
         
         if not has_logging and not is_pass and not is_raise:
-            # Determinar severidade baseado no contexto
+           
             severity = "MEDIUM"
             if self.current_function_node:
                 if self._is_security_critical(self.current_function_node.name):

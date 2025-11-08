@@ -47,10 +47,11 @@ Sanitizers (Higienizadores): Ele identifica funções que "limpam" os dados (ex:
 🚀 Estado do Projeto e Cronograma
 
 Semana 1 - Setup inicial e pesquisa sobre AST.
-Semana 2 - Pesquisa e estudo sobre Injections e Taint Analysis.
+Semana 2 - Pesquisa e estudo sobre Injections .
 Semana 3 - Protótipo de análise de padrões (BaseAnalyzers) para SQLi e Command-i.
-Semana 4 - Implementação do motor de Taint Analysis (TaintAnalyzer) e expansão para todas as 10 classes de injeção.
-Semana 5 - (Semana Atual) Refinamento do Taint Analysis (adição de Sanitizers) e lógica de confiança. Correção de falsos positivos e falsos negativos.
+Semana 4 - Implementação do motor de Taint Analysis (TaintAnalyzer) e expansão para todas as 10 classes de injeção (A03).
+Semana 5 -  Refinamento do Taint Analysis (adição de Sanitizers) e lógica de confiança. Correção de falsos positivos e falsos negativos.
+Semana 6 - (Semana Atual) Estudo sobre Security Logging and Monitoring Failues, prótito.
 
 
 

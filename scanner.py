@@ -23,7 +23,7 @@ from injection_analyzer import (
     HeaderInjectionAnalyzer,
     LogInjectionAnalyzer,  
 )
-from logging_analyzer import EnhancedLoggingAnalyzer
+from logging_analyzer import LoggingAnalyzer
 
 def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dict[str, Any]]:
     """
@@ -65,7 +65,7 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
     
     # A09: Analisadores de Falhas de Logging
     logging_analyzers = [
-       EnhancedLoggingAnalyzer(),
+       LoggingAnalyzer(),
     ]
 
     all_analyzers = injection_analyzers + logging_analyzers
@@ -108,7 +108,7 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
                     refined_problems.append(vuln)
                     tainted_count += 1
                 elif not is_taint_dependent:
-                    # Ex: XXE estático (resolve_entities=True)
+                    
                     refined_problems.append(vuln)
                     pattern_conf_count += 1
                 else:
