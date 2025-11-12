@@ -191,17 +191,74 @@ class LoggingAnalyzer(ast.NodeVisitor):
         elif self._is_data_modification(func_name):
             return 'data_modification'
         return None
+
+    
+    def _is_stub_function(self, func_node: ast.FunctionDef) -> bool:
+        """
+        Eng: Detects stub functions (pass, docstring, return)
+        PT:Deteta funções vazias (pass, docstring, return)
+        """
+        body = func_node.body
+        
+        # Remover docstrings
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+            body = body[1:]
+        
+        # Se não tiver corpo (só docstring)
+        if not body:
+            return True
+            
+       
+        if len(body) == 1:
+            statement = body[0]
+           
+            if isinstance(statement, ast.Pass):
+                return True
+           
+            if isinstance(statement, ast.Return):
+                if statement.value is None or isinstance(statement.value, ast.Constant):
+                    return True
+                    
+        return False
+
+    def _function_calls_critical_operations(self, func_node: ast.FunctionDef) -> bool:
+        """
+        Eng: Checks if the function calls critical operations
+        Pt:Verifica se a função chama operações críticas
+        """
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Call):
+                
+                if isinstance(node.func, ast.Name) and node.func.id == func_node.name:
+                    continue
+                    
+                func_name = self._get_full_name(node.func)
+                if self._is_security_critical(func_name) or self._is_data_modification(func_name):
+                    return True
+        return False
     
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        """Analisa funções por falta de logging apropriado"""
+        """
+        Eng: Analyzes functions for missing appropriate logging
+        Pt:Analisa funções por falta de logging apropriado
+        """
         self.current_function = node.name
         self.current_function_node = node
         
         has_logging = self._function_contains_logging(node)
         operation_type = self._get_operation_type(node.name)
         
-        # Verificar se operação crítica tem logging
+        
         if operation_type and not has_logging:
+            
+            
+            if self._is_stub_function(node):
+                
+                self.generic_visit(node)
+                self.current_function = None
+                self.current_function_node = None
+                return
+
             severity = "HIGH" if operation_type == 'critical_operation' else "MEDIUM"
             
             self.problems.append(Vulnerability(
@@ -226,7 +283,10 @@ class LoggingAnalyzer(ast.NodeVisitor):
         self.current_function_node = None
     
     def _analyze_log_call(self, node: ast.Call):
-        """Analisa uma chamada de logging específica"""
+        """
+        Eng: Analyzes a specific logging call
+        Pt:Analisa uma chamada de logging específica
+        """
         func_name = self._get_full_name(node.func)
         
         # Verificar se é função de logging
@@ -253,11 +313,20 @@ class LoggingAnalyzer(ast.NodeVisitor):
         
         # Verificar nível de log apropriado para operação crítica
         if self.current_function_node:
+            
+            # 1. Tentar pelo nome da função atual
             operation_type = self._get_operation_type(self.current_function_node.name)
+            
+            # 2. Se falhar, ver se chama funções críticas
+            if not operation_type and self._function_calls_critical_operations(self.current_function_node):
+                # Tratar como 'critical' para fins de logging
+                operation_type = 'critical_operation' 
+            
             if operation_type and log_level:
                 min_level = self.MIN_LOG_LEVELS.get(operation_type)
                 if min_level:
                     levels_order = ['debug', 'info', 'warning', 'error', 'critical']
+                    # Se o nível de log for inferior ao mínimo recomendado
                     if levels_order.index(log_level) < levels_order.index(min_level):
                         self.problems.append(Vulnerability(
                             line=node.lineno,
@@ -268,15 +337,17 @@ class LoggingAnalyzer(ast.NodeVisitor):
                             description=f"Security event logged at '{log_level}' level, should be at least '{min_level}'.",
                             severity="LOW",
                             confidence="MEDIUM",
-                            category="A09"
+                            category="A09" 
                         ))
     
     def visit_ExceptHandler(self, node: ast.ExceptHandler):
-        """Analisa tratamento de exceções"""
+        """
+        Eng:Analyzes exception handlers for logging practices           
+        Pt:Analisa tratamento de exceções
+        """
         has_logging = False
-        has_sensitive_in_log = False
         
-        # Procurar logging
+        # Procurar logging E verificar se loga o objeto da exceção
         for child in node.body:
             for sub_node in ast.walk(child):
                 if isinstance(sub_node, ast.Call):
@@ -284,30 +355,38 @@ class LoggingAnalyzer(ast.NodeVisitor):
                     if any(log in func_name for log in self.LOGGING_FUNCTIONS):
                         has_logging = True
                         
+                       
                         # Verificar se loga a exceção completa (pode conter dados sensíveis)
-                        for arg in sub_node.args:
-                            if isinstance(arg, ast.Name) and node.name and arg.id == node.name.id:
-                                # Logando o objeto de exceção diretamente
-                                self.problems.append(Vulnerability(
-                                    line=sub_node.lineno,
-                                    column=sub_node.col_offset,
-                                    type='Exception Object Logged',
-                                    function=self.current_function or 'unknown',
-                                    pattern='logging exception object',
-                                    description="Full exception object logged. This may expose sensitive data from stack traces.",
-                                    severity="MEDIUM",
-                                    confidence="MEDIUM",
-                                    category="A09"
-                                ))
-                        break
+                        
+                        exception_var_name = node.name if node.name else None 
+                        
+                        if exception_var_name:
+                            for arg in sub_node.args:
+                                #logging.error(e)
+                                if isinstance(arg, ast.Name) and arg.id == exception_var_name:
+                                    self._report_exception_object_logged(sub_node)
+                                    break
+                                
+                               #logging.error(f"...")
+                                if isinstance(arg, ast.JoinedStr):
+                                    for val in arg.values:
+                                        if isinstance(val, ast.FormattedValue) and \
+                                           isinstance(val.value, ast.Name) and \
+                                           val.value.id == exception_var_name:
+                                            self._report_exception_object_logged(sub_node)
+                                            break
+                                    if sub_node.lineno in {p.line for p in self.problems}: # Evitar duplicados
+                                        break
+                       
+            
             if has_logging:
                 break
         
-       
-        is_pass = len(node.body) == 1 and isinstance(node.body[0], ast.Pass)
+        
         is_raise = any(isinstance(child, ast.Raise) for child in node.body)
         
-        if not has_logging and not is_pass and not is_raise:
+       
+        if not has_logging and not is_raise:
            
             severity = "MEDIUM"
             if self.current_function_node:
@@ -327,3 +406,24 @@ class LoggingAnalyzer(ast.NodeVisitor):
             ))
         
         self.generic_visit(node)
+
+    def _report_exception_object_logged(self, sub_node: ast.Call):
+        """
+        Eng: Helper to report logging of exception object
+        Pt:Helper para reportar logging de objeto de exceção
+        """
+       
+        if any(p.line == sub_node.lineno and p.type == 'Exception Object Logged' for p in self.problems):
+            return
+            
+        self.problems.append(Vulnerability(
+            line=sub_node.lineno,
+            column=sub_node.col_offset,
+            type='Exception Object Logged',
+            function=self.current_function or 'unknown',
+            pattern='logging exception object',
+            description="Full exception object logged. This may expose sensitive data from stack traces.",
+            severity="MEDIUM",
+            confidence="MEDIUM",
+            category="A09"
+        ))
