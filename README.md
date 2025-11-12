@@ -18,7 +18,7 @@ LOW Confidence: Padrões perigosos encontrados, mas o Taint Analysis não confir
 
 🛡️ Vulnerabilidades Detetadas
 
-O protótipo atual (scanner.py) já deteta 10 tipos diferentes de vulnerabilidades de injeção:
+Injection_analyzer:
 -SQL Injection: cursor.execute(f"...")
 -Command Injection: os.system(...), subprocess.run(...)
 -Code Injection: eval(), exec()
@@ -30,6 +30,11 @@ O protótipo atual (scanner.py) já deteta 10 tipos diferentes de vulnerabilidad
 -Header Injection (CRLF): response.headers['...'] = ...
 -Log Injection: logging.error(f"...")
 
+Logging_analyzer:
+-Missing Security Logging
+-Sensitive Data in Logs
+-Inappropriate Log Level
+-Unlogged Exceptions
 
 ⚙️ Como Funciona (Notas de Desenvolvimento)
 O núcleo do scanner (scanner.py) opera num processo de duas fases:
@@ -51,7 +56,8 @@ Semana 2 - Pesquisa e estudo sobre Injections .
 Semana 3 - Protótipo de análise de padrões (BaseAnalyzers) para SQLi e Command-i.
 Semana 4 - Implementação do motor de Taint Analysis (TaintAnalyzer) e expansão para todas as 10 classes de injeção (A03).
 Semana 5 -  Refinamento do Taint Analysis (adição de Sanitizers) e lógica de confiança. Correção de falsos positivos e falsos negativos.
-Semana 6 - (Semana Atual) Estudo sobre Security Logging and Monitoring Failues, prótito.
+Semana 6 - Estudo sobre Security Logging and Monitoring Failues, prótito.
+Semana 7 - (Semana atual) refinamento do logging_analyzer 
 
 
 
