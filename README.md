@@ -57,7 +57,8 @@ Semana 3 - Protótipo de análise de padrões (BaseAnalyzers) para SQLi e Comman
 Semana 4 - Implementação do motor de Taint Analysis (TaintAnalyzer) e expansão para todas as 10 classes de injeção (A03).
 Semana 5 -  Refinamento do Taint Analysis (adição de Sanitizers) e lógica de confiança. Correção de falsos positivos e falsos negativos.
 Semana 6 - Estudo sobre Security Logging and Monitoring Failues, prótito.
-Semana 7 - (Semana atual) refinamento do logging_analyzer 
+Semana 7 - refinamento do logging_analyzer 
+Semana 8 - (Semana atual) -> dependency_analyzer
 
 
 

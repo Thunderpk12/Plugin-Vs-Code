@@ -530,6 +530,69 @@ def nested_sanitization_bypass(user_input):
     query = f"SELECT * FROM users WHERE name = '{cleaned}'"  # VULN: ainda vulnerável
     return query
 
+# ==================== A06: VULNERABLE COMPONENTS ====================
+
+def unsafe_imports():
+    """VULN: Imports perigosos"""
+    import pickle  # VULN: A06
+    import telnetlib  # VULN: A06 (uso de protocolo inseguro)
+    import xmlrpc.server # VULN: A06
+    
+    data = b"..."
+    # Pickle load é detectado
+    obj = pickle.loads(data) # VULN: A06 Deserialization
+
+def unsafe_yaml_usage(yaml_string):
+    """VULN: Yaml load inseguro"""
+    import yaml
+    
+    # Load inseguro (padrão antigo)
+    data = yaml.load(yaml_string) # VULN: A06
+    
+    # Load com Loader inseguro explícito
+    data2 = yaml.load(yaml_string, Loader=yaml.UnsafeLoader) # VULN: A06
+    
+    return data
+
+def safe_yaml_usage(yaml_string):
+    """SAFE: Yaml load seguro"""
+    import yaml
+    
+    # Safe load direto
+    data = yaml.safe_load(yaml_string) # SAFE
+    
+    # Load com SafeLoader
+    data2 = yaml.load(yaml_string, Loader=yaml.SafeLoader) # SAFE
+    
+    return data
+
+def deprecated_functions():
+    """VULN: Funções deprecated"""
+    import os
+    import random
+    
+    # Uso de os.popen (deprecated)
+    stream = os.popen("echo hello") # VULN: A06
+    
+    # Uso de gerador aleatório fraco para crypto (contexto simulado)
+    key = random.random() # VULN: A06
+    
+    return key
+
+def weak_crypto_hash():
+    """VULN: Algoritmos de hash fracos"""
+    import hashlib
+    
+    m = hashlib.md5() # VULN: A06
+    m.update(b"hello")
+    
+    s = hashlib.sha1() # VULN: A06
+    
+    safe = hashlib.sha256() # SAFE
+    
+    return m.hexdigest()
+
+
 
 # ==================== HELPER FUNCTIONS ====================
 

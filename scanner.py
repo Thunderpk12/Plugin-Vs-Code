@@ -4,10 +4,10 @@ Pt:Scanner de Segurança Principal - Orquestra todos os analisadores
 """
 
 import ast
+import os # Import necessário para path
 from typing import List, Dict, Any
 import json
 import sys
-
 
 from models import Vulnerability
 from taint_analysis import TaintAnalyzer
@@ -24,11 +24,12 @@ from injection_analyzer import (
     LogInjectionAnalyzer,  
 )
 from logging_analyzer import LoggingAnalyzer
+from dependency_analyzer import DependencyAnalyzer # <--- IMPORT NOVO
 
 def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dict[str, Any]]:
     """
     Analisa um ficheiro Python em busca de vulnerabilidades de segurança
-    em múltiplas categorias OWASP.
+    em múltiplas categorias OWASP (A03, A06, A09).
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -60,7 +61,7 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
         XPathInjectionAnalyzer(),
         XMLInjectionAnalyzer(),
         HeaderInjectionAnalyzer(),
-        LogInjectionAnalyzer(), # A03
+        LogInjectionAnalyzer(), 
     ]
     
     # A09: Analisadores de Falhas de Logging
@@ -68,15 +69,38 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
        LoggingAnalyzer(),
     ]
 
-    all_analyzers = injection_analyzers + logging_analyzers
+    # A06: Componentes Vulneráveis
+    
+    dep_analyzer = DependencyAnalyzer()
+    
+    # Lista base de visitantes AST
+    ast_visitors = injection_analyzers + logging_analyzers + [dep_analyzer]
+    
     all_problems: List[Vulnerability] = []
 
-    for analyzer in all_analyzers:
+    # 1. Executar Visitors na AST (Código Python)
+    for analyzer in ast_visitors:
         try:
             analyzer.visit(code_ast)
             all_problems.extend(analyzer.problems)
         except Exception as e:
             print(f"Error running analyzer {analyzer.__class__.__name__}: {e}")
+            
+    # 2. Executar análise de requirements.txt (A06 Extra)
+    # Tenta encontrar um requirements.txt na mesma pasta do ficheiro analisado
+    try:
+        file_dir = os.path.dirname(os.path.abspath(file_path))
+        req_path = os.path.join(file_dir, "requirements.txt")
+        if os.path.exists(req_path):
+            print(f"   [A06] Analyzing dependencies in: {req_path}")
+            dep_analyzer.scan_requirements(req_path)
+         
+            for p in dep_analyzer.problems:
+                if p.function == 'requirements.txt':
+                    all_problems.append(p)
+    except Exception as e:
+        print(f"Error checking requirements: {e}")
+
     
     print(f"   Found {len(all_problems)} potential issues")
     
@@ -108,7 +132,6 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
                     refined_problems.append(vuln)
                     tainted_count += 1
                 elif not is_taint_dependent:
-                    
                     refined_problems.append(vuln)
                     pattern_conf_count += 1
                 else:
@@ -117,7 +140,7 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
                     refined_problems.append(vuln)
                     low_conf_count += 1
             else:
-                # A09 e outros: passam sem taint analysis
+                # A06, A09 e outros: passam sem taint analysis
                 refined_problems.append(vuln)
         
         print(f"   {tainted_count} A03 confirmed with taint analysis")
@@ -178,7 +201,7 @@ def show_results(problems: List[Dict[str, Any]], verbose: bool = True, show_low_
                 print(f"Problem #{i} [{severity_tag}] [{confidence_tag}]")
                 print(f"    Location:    Line {problem['line']}, Column {problem['column']}")
                 print(f"    Type:        {problem['type']}")
-                print(f"    Function:    {problem['function']}()")
+                print(f"    Function:    {problem['function']}") # Removido () pois requirements não é função
                 print(f"    Pattern:     {problem['pattern']}")
                 print(f"    Description: {problem['description']}")
                 if problem.get('tainted'):
@@ -186,7 +209,7 @@ def show_results(problems: List[Dict[str, Any]], verbose: bool = True, show_low_
                 print()
         else:
             for problem in cat_problems:
-                print(f"L{problem['line']}: [{problem['severity']}/{problem['confidence']}] {problem['type']} in {problem['function']}()")
+                print(f"L{problem['line']}: [{problem['severity']}/{problem['confidence']}] {problem['type']} in {problem['function']}")
 
 
 def export_json(problems: List[Dict[str, Any]], output_file: str = "analysis_results.json"):
