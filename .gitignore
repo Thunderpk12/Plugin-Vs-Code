@@ -1,21 +1,21 @@
-# Ignorar dependências do Node.js (Gera milhares de ficheiros)
+
 **/node_modules/
 node_modules/
 
-# Ignorar pastas de build (Onde o TypeScript mete o JS compilado)
+
 **/dist/
 **/out/
 dist/
 out/
 
-# Ignorar cache do Python e ficheiros compilados
+
 **/__pycache__/
 *.pyc
 
-# Ignorar ficheiros de sistema e logs
+
 .DS_Store
 *.log
 analysis_results.json
 
-# Se quiseres ignorar a pasta .vscode da raiz mas manter a da extensão:
+
 /.vscode/
