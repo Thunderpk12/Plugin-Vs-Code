@@ -4,10 +4,11 @@ Pt:Scanner de Segurança Principal - Orquestra todos os analisadores
 """
 
 import ast
-import os # Import necessário para path
+import os
 from typing import List, Dict, Any
 import json
 import sys
+import argparse # Importante para ler os argumentos
 
 from models import Vulnerability
 from taint_analysis import TaintAnalyzer
@@ -24,31 +25,33 @@ from injection_analyzer import (
     LogInjectionAnalyzer,  
 )
 from logging_analyzer import LoggingAnalyzer
-from dependency_analyzer import DependencyAnalyzer # <--- IMPORT NOVO
+from dependency_analyzer import DependencyAnalyzer
 
-def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dict[str, Any]]:
+# Adicionei o parametro 'silent'
+def analyze_file(file_path: str, enable_taint_analysis: bool = True, silent: bool = False) -> List[Dict[str, Any]]:
     """
-    Analisa um ficheiro Python em busca de vulnerabilidades de segurança
-    em múltiplas categorias OWASP (A03, A06, A09).
+    Analisa um ficheiro Python em busca de vulnerabilidades.
+    Se silent=True, não faz prints para a consola (apenas retorna a lista).
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             code = file.read()
     except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.")
+        if not silent: print(f"Error: File '{file_path}' not found.")
         return []
     except Exception as e:
-        print(f"Error reading file: {e}")
+        if not silent: print(f"Error reading file: {e}")
         return []
 
     try:
         code_ast = ast.parse(code, filename=file_path)
     except SyntaxError as e:
-        print(f"Syntax error in file (line {e.lineno}): {e.msg}")
+        if not silent: print(f"Syntax error in file (line {e.lineno}): {e.msg}")
         return []
     
-    
-    print("Phase 1: Pattern-based detection...")
+    # Só imprime se NÃO estiver em modo silencioso
+    if not silent:
+        print("Phase 1: Pattern-based detection...")
     
     # A03: Analisadores de Injeção
     injection_analyzers = [
@@ -70,7 +73,6 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
     ]
 
     # A06: Componentes Vulneráveis
-    
     dep_analyzer = DependencyAnalyzer()
     
     # Lista base de visitantes AST
@@ -78,35 +80,34 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
     
     all_problems: List[Vulnerability] = []
 
-    # 1. Executar Visitors na AST (Código Python)
+    # 1. Executar Visitors na AST
     for analyzer in ast_visitors:
         try:
             analyzer.visit(code_ast)
             all_problems.extend(analyzer.problems)
         except Exception as e:
-            print(f"Error running analyzer {analyzer.__class__.__name__}: {e}")
+            if not silent: print(f"Error running analyzer {analyzer.__class__.__name__}: {e}")
             
-    # 2. Executar análise de requirements.txt (A06 Extra)
-    # Tenta encontrar um requirements.txt na mesma pasta do ficheiro analisado
+    # 2. Executar análise de requirements.txt
     try:
         file_dir = os.path.dirname(os.path.abspath(file_path))
         req_path = os.path.join(file_dir, "requirements.txt")
         if os.path.exists(req_path):
-            print(f"   [A06] Analyzing dependencies in: {req_path}")
+            if not silent: print(f"   [A06] Analyzing dependencies in: {req_path}")
             dep_analyzer.scan_requirements(req_path)
          
             for p in dep_analyzer.problems:
                 if p.function == 'requirements.txt':
                     all_problems.append(p)
     except Exception as e:
-        print(f"Error checking requirements: {e}")
+        if not silent: print(f"Error checking requirements: {e}")
 
+    if not silent:
+        print(f"   Found {len(all_problems)} potential issues")
     
-    print(f"   Found {len(all_problems)} potential issues")
-    
-    # Taint analysis (refinamento apenas para A03 - Injection)
+    # Taint analysis
     if enable_taint_analysis:
-        print("Phase 2: Taint analysis refinement (A03 only)...")
+        if not silent: print("Phase 2: Taint analysis refinement (A03 only)...")
         taint_analyzer = TaintAnalyzer()
         taint_analyzer.visit(code_ast)
         
@@ -116,11 +117,8 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
         pattern_conf_count = 0
         
         for vuln in all_problems:
-            # Apenas refinar injeções com taint
             if vuln.category == "A03":
                 is_tainted = taint_analyzer.is_line_tainted(vuln.line)
-                
-                # Padrões que dependem de variáveis
                 is_taint_dependent = "variable" in vuln.pattern or \
                                      "f-string" in vuln.pattern or \
                                      "concatenation" in vuln.pattern or \
@@ -140,12 +138,12 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
                     refined_problems.append(vuln)
                     low_conf_count += 1
             else:
-                # A06, A09 e outros: passam sem taint analysis
                 refined_problems.append(vuln)
         
-        print(f"   {tainted_count} A03 confirmed with taint analysis")
-        print(f"   {pattern_conf_count} A03 confirmed by static pattern")
-        print(f"   {low_conf_count} A03 marked as low confidence")
+        if not silent:
+            print(f"   {tainted_count} A03 confirmed with taint analysis")
+            print(f"   {pattern_conf_count} A03 confirmed by static pattern")
+            print(f"   {low_conf_count} A03 marked as low confidence")
         
         return [v.to_dict() for v in refined_problems]
     
@@ -155,7 +153,6 @@ def analyze_file(file_path: str, enable_taint_analysis: bool = True) -> List[Dic
 # ===================== RESULTS PRESENTATION =====================
 
 def show_results(problems: List[Dict[str, Any]], verbose: bool = True, show_low_confidence: bool = True):
-    """Exibe os resultados organizados por categoria OWASP"""
     if not problems:
         print("No security problems found")
         return
@@ -167,23 +164,19 @@ def show_results(problems: List[Dict[str, Any]], verbose: bool = True, show_low_
         print("No high/medium-confidence security problems found")
         return
     
-    # Agrupar por categoria
     by_category: Dict[str, List[Dict[str, Any]]] = {}
     for p in problems:
         cat = p.get('category', 'UNKNOWN')
         by_category.setdefault(cat, []).append(p)
     
     print(f"\n{'='*70}")
-    print(f"Found {len(problems)} potential vulnerabilities (showing { 'all' if show_low_confidence else 'medium/high confidence' })")
+    print(f"Found {len(problems)} potential vulnerabilities")
     for cat, vulns in sorted(by_category.items()):
         print(f"   {cat}: {len(vulns)} issues")
     print(f"{'='*70}")
     
-    # Mostrar por categoria
     for category in sorted(by_category.keys()):
         cat_problems = by_category[category]
-        
-        # Ordenar problemas dentro da categoria
         cat_problems.sort(key=lambda p: (
             {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}.get(p['severity'], 9),
             {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}.get(p['confidence'], 9),
@@ -192,16 +185,14 @@ def show_results(problems: List[Dict[str, Any]], verbose: bool = True, show_low_
         ))
         
         print(f"\n--- {category} ---")
-        
         if verbose:
             for i, problem in enumerate(cat_problems, 1):
                 severity_tag = problem['severity']
                 confidence_tag = problem['confidence']
-                
                 print(f"Problem #{i} [{severity_tag}] [{confidence_tag}]")
                 print(f"    Location:    Line {problem['line']}, Column {problem['column']}")
                 print(f"    Type:        {problem['type']}")
-                print(f"    Function:    {problem['function']}") # Removido () pois requirements não é função
+                print(f"    Function:    {problem['function']}")
                 print(f"    Pattern:     {problem['pattern']}")
                 print(f"    Description: {problem['description']}")
                 if problem.get('tainted'):
@@ -211,9 +202,7 @@ def show_results(problems: List[Dict[str, Any]], verbose: bool = True, show_low_
             for problem in cat_problems:
                 print(f"L{problem['line']}: [{problem['severity']}/{problem['confidence']}] {problem['type']} in {problem['function']}")
 
-
 def export_json(problems: List[Dict[str, Any]], output_file: str = "analysis_results.json"):
-    """Exporta resultados para JSON"""
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(problems, f, indent=2, ensure_ascii=False)
@@ -221,24 +210,25 @@ def export_json(problems: List[Dict[str, Any]], output_file: str = "analysis_res
     except Exception as e:
         print(f"Error exporting JSON: {e}")
 
-
 # ==========================================
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Python Vulnerability Scanner')
+    parser.add_argument('file', help='File to analyze')
+    parser.add_argument('--json-only', action='store_true', help='Output only JSON for VS Code')
     
-    file_to_analyze = sys.argv[1] if len(sys.argv) > 1 else "vulneravel.py"
-    enable_taint = True
-    export_file = None 
-    hide_low = False
-    brief_output = False
+    args = parser.parse_args()
     
-    print(f"\nAnalyzing file: {file_to_analyze}")
-    print(f"   Taint analysis: {'enabled' if enable_taint else 'disabled'}")
-    print()
+    # Se NÃO for json-only, imprime o cabeçalho
+    if not args.json_only:
+        print(f"\nAnalyzing file: {args.file}")
+
+    # Passamos o argumento silent=args.json_only para a função principal
+    found_problems = analyze_file(args.file, enable_taint_analysis=True, silent=args.json_only)
     
-    found_problems = analyze_file(file_to_analyze, enable_taint_analysis=enable_taint)
-    
-    show_results(found_problems, verbose=not brief_output, show_low_confidence=not hide_low)
-    
-    if export_file:
-        export_json(found_problems, export_file)
+    if args.json_only:
+        # AQUI É O SEGREDO: Só imprime o JSON, nada mais
+        print(json.dumps(found_problems))
+    else:
+        # Modo humano
+        show_results(found_problems, verbose=True, show_low_confidence=True)
