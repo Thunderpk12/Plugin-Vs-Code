@@ -13,13 +13,24 @@
     "*"
   ],
   "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "npm.helloWorld",
-        "title": "Hello World"
-      }
-    ]
+ "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vuln-scanner-sidebar",
+          "title": "Security Scanner",
+          "icon": "media/shield.svg"
+        }
+      ]
+    },
+    "views": {
+      "vuln-scanner-sidebar": [
+        {
+          "id": "vuln-scanner-view",
+          "name": "Vulnerabilidades Encontradas"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

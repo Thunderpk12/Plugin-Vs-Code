@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { SidebarProvider } from './SidebarProvider';
 
-// Define o formato do JSON que vem do Python
 interface Vulnerability {
     line: number;
     column: number;
@@ -18,21 +18,26 @@ interface Vulnerability {
 
 let diagnosticCollection: vscode.DiagnosticCollection;
 let outputChannel: vscode.OutputChannel;
+let sidebarProvider: SidebarProvider;
 
 export function activate(context: vscode.ExtensionContext) {
-    // 1. Criar canal de Output para ver logs
     outputChannel = vscode.window.createOutputChannel("Python Vuln Scanner");
     outputChannel.appendLine("Extensão a iniciar...");
     
-    // 2. Mensagem visual de confirmação (Prova de Vida)
     vscode.window.showInformationMessage("🚀 O Scanner de Segurança está ATIVO!"); 
 
-    // 3. Criar a coleção de diagnósticos
     diagnosticCollection = vscode.languages.createDiagnosticCollection('python-vuln-scanner');
     context.subscriptions.push(diagnosticCollection);
 
-    // 4. Registar eventos
-    // Analisar quando salva
+    sidebarProvider = new SidebarProvider();
+    vscode.window.registerTreeDataProvider('vuln-scanner-view', sidebarProvider);
+
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider('python', new SecurityFixProvider(), {
+            providedCodeActionKinds: SecurityFixProvider.providedCodeActionKinds
+        })
+    );
+
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(document => {
             if (document.languageId === 'python') {
@@ -41,7 +46,6 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Analisar quando muda de aba
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor(editor => {
             if (editor && editor.document.languageId === 'python') {
@@ -50,15 +54,63 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    outputChannel.appendLine("Extensão carregada com sucesso e à espera de ficheiros Python.");
+    outputChannel.appendLine("Extensão carregada com sucesso.");
+}
+
+class SecurityFixProvider implements vscode.CodeActionProvider {
+    public static readonly providedCodeActionKinds = [
+        vscode.CodeActionKind.QuickFix
+    ];
+
+    provideCodeActions(document: vscode.TextDocument, range: vscode.Range | vscode.Selection, context: vscode.CodeActionContext, token: vscode.CancellationToken): vscode.CodeAction[] {
+        return context.diagnostics
+            .filter(diagnostic => diagnostic.source === 'Python Security Scanner')
+            .map(diagnostic => this.createFix(document, range, diagnostic))
+            .filter(action => action !== undefined) as vscode.CodeAction[];
+    }
+
+    private createFix(document: vscode.TextDocument, range: vscode.Range, diagnostic: vscode.Diagnostic): vscode.CodeAction | undefined {
+        if (diagnostic.message.includes('os.system')) {
+            const action = new vscode.CodeAction('Substituir por subprocess.run (Seguro)', vscode.CodeActionKind.QuickFix);
+            action.diagnostics = [diagnostic];
+            action.isPreferred = true;
+            const line = document.lineAt(diagnostic.range.start.line);
+            const text = line.text;
+            const newText = text.replace('os.system', 'subprocess.run').replace(')', ', shell=False)');
+            action.edit = new vscode.WorkspaceEdit();
+            action.edit.replace(document.uri, line.range, newText);
+            return action;
+        }
+
+        if (diagnostic.message.includes('yaml.load')) {
+            const action = new vscode.CodeAction('Usar yaml.safe_load', vscode.CodeActionKind.QuickFix);
+            action.diagnostics = [diagnostic];
+            action.isPreferred = true;
+            const line = document.lineAt(diagnostic.range.start.line);
+            const newText = line.text.replace('yaml.load', 'yaml.safe_load');
+            action.edit = new vscode.WorkspaceEdit();
+            action.edit.replace(document.uri, line.range, newText);
+            return action;
+        }
+
+        if (diagnostic.message.includes('MD5')) {
+            const action = new vscode.CodeAction('Atualizar para SHA256', vscode.CodeActionKind.QuickFix);
+            action.diagnostics = [diagnostic];
+            const line = document.lineAt(diagnostic.range.start.line);
+            const newText = line.text.replace('md5', 'sha256');
+            action.edit = new vscode.WorkspaceEdit();
+            action.edit.replace(document.uri, line.range, newText);
+            return action;
+        }
+
+        return undefined;
+    }
 }
 
 function runScanner(document: vscode.TextDocument, context: vscode.ExtensionContext) {
-    // 1. Caminho absoluto para o script Python dentro da pasta da extensão
     const scriptPath = path.join(context.extensionPath, 'backend', 'scanner.py');
     const filePath = document.fileName;
-
-    // Debug: Verificar caminhos no Output
+    
     outputChannel.appendLine(`--- A analisar: ${filePath} ---`);
 
     if (!fs.existsSync(scriptPath)) {
@@ -67,15 +119,9 @@ function runScanner(document: vscode.TextDocument, context: vscode.ExtensionCont
         return;
     }
 
-    // 2. Comando para executar (Windows usa 'python' ou 'py', Linux/Mac usa 'python3')
-    // Se falhar, podes tentar mudar para "py" ou o caminho completo do executável
     const pythonExecutable = 'python'; 
-    
-    // --json-only é fundamental para recebermos apenas dados limpos
     const command = `"${pythonExecutable}" "${scriptPath}" "${filePath}" --json-only`;
 
-    // 3. Executar o script
-    // cwd: context.extensionPath garante que os imports do Python funcionam
     cp.exec(command, { cwd: path.join(context.extensionPath, 'backend') }, (err, stdout, stderr) => {
         if (err) {
             outputChannel.appendLine(`ERRO DE EXECUÇÃO: ${err.message}`);
@@ -89,15 +135,16 @@ function runScanner(document: vscode.TextDocument, context: vscode.ExtensionCont
                 return;
             }
 
-            // 4. Parse do JSON
             const vulnerabilities: Vulnerability[] = JSON.parse(stdout);
+            
+            if (sidebarProvider) {
+               sidebarProvider.refresh(vulnerabilities);
+            }
+            
             outputChannel.appendLine(`Sucesso! Encontradas ${vulnerabilities.length} vulnerabilidades.`);
 
-            // 5. Mapear para o VS Code
             const diagnostics: vscode.Diagnostic[] = vulnerabilities.map(vuln => {
-                // VS Code linhas começam em 0, Python em 1
                 const lineIndex = vuln.line > 0 ? vuln.line - 1 : 0;
-                
                 const range = new vscode.Range(lineIndex, 0, lineIndex, 1000);
 
                 const diagnostic = new vscode.Diagnostic(
@@ -111,7 +158,6 @@ function runScanner(document: vscode.TextDocument, context: vscode.ExtensionCont
                 return diagnostic;
             });
 
-            // 6. Atualizar o editor
             diagnosticCollection.set(document.uri, diagnostics);
 
         } catch (e) {
@@ -124,9 +170,9 @@ function runScanner(document: vscode.TextDocument, context: vscode.ExtensionCont
 
 function mapSeverity(severity: string): vscode.DiagnosticSeverity {
     switch (severity) {
-        case 'HIGH': return vscode.DiagnosticSeverity.Error;       // Vermelho
-        case 'MEDIUM': return vscode.DiagnosticSeverity.Warning;   // Amarelo
-        case 'LOW': return vscode.DiagnosticSeverity.Information;  // Azul
+        case 'HIGH': return vscode.DiagnosticSeverity.Error;
+        case 'MEDIUM': return vscode.DiagnosticSeverity.Warning;
+        case 'LOW': return vscode.DiagnosticSeverity.Information;
         default: return vscode.DiagnosticSeverity.Hint;
     }
 }
