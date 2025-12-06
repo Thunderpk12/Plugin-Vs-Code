@@ -13,7 +13,43 @@
     "*"
   ],
   "main": "./dist/extension.js",
- "contributes": {
+  "contributes": {
+    "commands": [
+      {
+        "command": "python-vuln-scanner.openSettings",
+        "title": "Scanner Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "python-vuln-scanner.disable",
+        "title": "Pause Scanner",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "python-vuln-scanner.enable",
+        "title": "Start Scanner",
+        "icon": "$(play)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "python-vuln-scanner.enable",
+          "when": "view == vuln-scanner-view && !pythonVulnScanner.enabled",
+          "group": "navigation@1"
+        },
+        {
+          "command": "python-vuln-scanner.disable",
+          "when": "view == vuln-scanner-view && pythonVulnScanner.enabled",
+          "group": "navigation@1"
+        },
+        {
+          "command": "python-vuln-scanner.openSettings",
+          "when": "view == vuln-scanner-view",
+          "group": "navigation@2"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -27,9 +63,44 @@
       "vuln-scanner-sidebar": [
         {
           "id": "vuln-scanner-view",
-          "name": "Vulnerabilidades Encontradas"
+          "name": "Security Results"
         }
       ]
+    },
+    "configuration": {
+      "title": "Python Security Scanner",
+      "properties": {
+        "pythonVulnScanner.analyzers.enableInjection": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable A03: Injection Analysis",
+          "scope": "resource"
+        },
+        "pythonVulnScanner.analyzers.enableAuth": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable A07: Auth Failures Analysis",
+          "scope": "resource"
+        },
+        "pythonVulnScanner.analyzers.enableLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable A09: Logging Failures Analysis",
+          "scope": "resource"
+        },
+        "pythonVulnScanner.analyzers.enableDependencies": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable A06: Vulnerable Components Analysis",
+          "scope": "resource"
+        },
+        "pythonVulnScanner.engine.enableTaintAnalysis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Deep Taint Analysis (Slower but more accurate)",
+          "scope": "resource"
+        }
+      }
     }
   },
   "scripts": {

@@ -67,7 +67,7 @@ class DependencyAnalyzer(ast.NodeVisitor):
         'exec': 'Avoid exec() - use safer alternatives',
     }
     
-    # Funções inseguras do YAML
+    # Funções inseguras do YAML (Nomes exatos)
     UNSAFE_YAML_FUNCTIONS = {'load', 'load_all', 'FullLoader', 'UnsafeLoader'}
     
     def __init__(self):
@@ -148,10 +148,7 @@ class DependencyAnalyzer(ast.NodeVisitor):
         """
         func_name = self._get_full_name(node.func)
         
-        
         if func_name in self.DEPRECATED_FUNCTIONS:
-            # Evitar duplicados se já foi pego por CodeInjection (A03)
-            # Mas A06 foca no componente/função obsoleta
             self.problems.append(Vulnerability(
                 line=node.lineno,
                 column=node.col_offset,
@@ -166,30 +163,43 @@ class DependencyAnalyzer(ast.NodeVisitor):
         
         # Caso especial: yaml.load() inseguro
         if 'yaml' in self.imported_modules:
-            if any(unsafe in func_name for unsafe in self.UNSAFE_YAML_FUNCTIONS):
-                # Verificar se usa Loader seguro nos argumentos
-                uses_safe_loader = False
-                for kw in node.keywords:
-                    if kw.arg == 'Loader':
-                        loader_name = self._get_full_name(kw.value)
-                        if 'SafeLoader' in loader_name or 'BaseLoader' in loader_name:
-                            uses_safe_loader = True
-                
-                if not uses_safe_loader:
-                    self.problems.append(Vulnerability(
-                        line=node.lineno,
-                        column=node.col_offset,
-                        type='Unsafe YAML Loading',
-                        function=func_name,
-                        pattern='yaml.load() without SafeLoader',
-                        description="Using yaml.load() without SafeLoader enables arbitrary code execution. Use yaml.safe_load() instead.",
-                        severity="HIGH",
-                        confidence="HIGH",
-                        category="A06"
-                    ))
+            # CORREÇÃO: Verificar o nome exato do método, não apenas se contém a string "load"
+            # Isto evita falsos positivos com 'json.loads', 'yaml.safe_load', 'pickle.loads'
+            
+            parts = func_name.split('.')
+            method_name = parts[-1] # Apanha 'load', 'safe_load', 'loads'
+            module_prefix = parts[0] if len(parts) > 1 else None
+
+            # Verifica se o método é inseguro E (se tiver prefixo) garante que não é json/pickle
+            if method_name in self.UNSAFE_YAML_FUNCTIONS:
+                # Se for json.load ou pickle.load, ignoramos
+                if module_prefix and module_prefix in {'json', 'pickle', 'cPickle'}:
+                    pass
+                else:
+                    # Verificar se usa Loader seguro nos argumentos
+                    uses_safe_loader = False
+                    for kw in node.keywords:
+                        if kw.arg == 'Loader':
+                            loader_name = self._get_full_name(kw.value)
+                            if 'SafeLoader' in loader_name or 'BaseLoader' in loader_name:
+                                uses_safe_loader = True
+                    
+                    if not uses_safe_loader:
+                        self.problems.append(Vulnerability(
+                            line=node.lineno,
+                            column=node.col_offset,
+                            type='Unsafe YAML Loading',
+                            function=func_name,
+                            pattern='yaml.load() without SafeLoader',
+                            description="Using yaml.load() without SafeLoader enables arbitrary code execution. Use yaml.safe_load() instead.",
+                            severity="HIGH",
+                            confidence="HIGH",
+                            category="A06"
+                        ))
         
         # Caso especial: pickle
         if 'pickle' in self.imported_modules or 'cPickle' in self.imported_modules:
+            # Aqui também verificamos strings específicas
             if 'pickle.load' in func_name or 'pickle.loads' in func_name:
                 self.problems.append(Vulnerability(
                     line=node.lineno,
