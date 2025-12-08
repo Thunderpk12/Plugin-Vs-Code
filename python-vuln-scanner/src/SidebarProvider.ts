@@ -9,8 +9,9 @@ export interface Vulnerability {
     category: string;
 }
 
-// Mapa de Nomes Completos para Categorias OWASP
+
 const CATEGORY_NAMES: { [key: string]: string } = {
+    'A01': 'A01: Broken Access Control',
     'A03': 'A03: Injection',
     'A06': 'A06: Vulnerable Components',
     'A07': 'A07: Identification & Auth Failures',
@@ -50,7 +51,7 @@ export class SidebarProvider implements vscode.TreeDataProvider<VulnItem> {
         }
 
         if (!element) {
-            // NÍVEL 1: CATEGORIAS (Com nomes completos)
+            
             const categories = Array.from(new Set(this.vulnerabilities.map(v => v.category))).sort();
             
             if (categories.length === 0) {
@@ -59,14 +60,14 @@ export class SidebarProvider implements vscode.TreeDataProvider<VulnItem> {
 
             return Promise.resolve(categories.map(cat => {
                 const count = this.vulnerabilities.filter(v => v.category === cat).length;
-                // Traduz o código (ex: A07) para o nome completo
+               
                 const fullName = CATEGORY_NAMES[cat] || cat;
                 return new VulnItem(`${fullName} (${count})`, "categoria", vscode.TreeItemCollapsibleState.Expanded);
             }));
         } else {
-            // NÍVEL 2: ITENS
+           
             if (element.contextValue === "categoria") {
-                // Extrai o código "A03" do início da string "A03: Injection..."
+                
                 const categoryCode = element.label.split(':')[0]; 
                 const filtered = this.vulnerabilities.filter(v => v.category === categoryCode);
                 
@@ -115,7 +116,7 @@ class VulnItem extends vscode.TreeItem {
             this.description = shortDesc;
         }
         
-        // --- ÍCONES ---
+        
         if (type === "item") {
             if (severity === 'HIGH') {
                 this.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('testing.iconFailed')); 
@@ -126,9 +127,12 @@ class VulnItem extends vscode.TreeItem {
             }
         } 
         else if (type === "categoria") {
-            const catCode = label.split(':')[0]; // Apanha o código antes dos dois pontos
+            const catCode = label.split(':')[0]; 
             
             switch (catCode) {
+                case 'A01': 
+                    this.iconPath = new vscode.ThemeIcon('lock', new vscode.ThemeColor('charts.red')); 
+                    break;
                 case 'A03': 
                     this.iconPath = new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('charts.red')); 
                     break;

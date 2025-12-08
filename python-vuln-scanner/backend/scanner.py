@@ -28,6 +28,9 @@ from injection_analyzer import (
     LogInjectionAnalyzer,  
 )
 
+# A01 - Access Control Analyzer
+from access_control_analyzer import AccessControlAnalyzer
+
 # A09 - Logging Analyzer
 from logging_analyzer import LoggingAnalyzer
 
@@ -44,13 +47,14 @@ def analyze_file(file_path: str,
                  enable_auth: bool = True,
                  enable_logging: bool = True,
                  enable_dependencies: bool = True,
+                 enable_access_control: bool = True,
                  silent: bool = False) -> List[Dict[str, Any]]:
     """
     Analisa um ficheiro Python em busca de vulnerabilidades, permitindo
     ligar/desligar categorias específicas.
     """
     
-    # 1. Leitura do Ficheiro
+    
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             code = file.read()
@@ -61,7 +65,7 @@ def analyze_file(file_path: str,
         if not silent: print(f"Error reading file: {e}")
         return []
 
-    # 2. Parsing da AST
+   
     try:
         code_ast = ast.parse(code, filename=file_path)
     except SyntaxError as e:
@@ -71,8 +75,12 @@ def analyze_file(file_path: str,
     if not silent:
         print("Phase 1: Pattern-based detection...")
     
-    # 3. Construção da Lista de Visitors (Baseado nas configurações)
+   
     ast_visitors = []
+    
+    if enable_access_control:
+        if not silent: print("   [+] Access Control Analyzer (A01) enabled")
+        ast_visitors.append(AccessControlAnalyzer())
 
     # [A03] Injection
     if enable_injection:
@@ -269,14 +277,13 @@ def export_json(problems: List[Dict[str, Any]], output_file: str = "analysis_res
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Python Vulnerability Scanner')
     
-    # Argumento obrigatório: ficheiro
+    
     parser.add_argument('file', help='File to analyze')
     
-    # Argumento de formato de saída
+
     parser.add_argument('--json-only', action='store_true', help='Output only JSON for VS Code integration')
     
-    # Argumentos de Configuração (Flags "Skip" para facilitar integração com VS Code settings)
-    # Se a flag estiver presente, o módulo será DESATIVADO.
+    parser.add_argument('--skip-access-control', action='store_true', help='Disable A01 Access Control checks')
     parser.add_argument('--skip-injection', action='store_true', help='Disable A03 Injection checks')
     parser.add_argument('--skip-auth', action='store_true', help='Disable A07 Auth checks')
     parser.add_argument('--skip-logging', action='store_true', help='Disable A09 Logging checks')
@@ -285,10 +292,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    # Se NÃO for json-only, imprime o cabeçalho informativo
+    
     if not args.json_only:
         print(f"\nAnalyzing file: {args.file}")
         print(f"Configuration:")
+        print(f"  - Access Control (A01): {'DISABLED' if args.skip_access_control else 'ENABLED'}")
         print(f"  - Injection (A03): {'DISABLED' if args.skip_injection else 'ENABLED'}")
         print(f"  - Auth (A07):      {'DISABLED' if args.skip_auth else 'ENABLED'}")
         print(f"  - Logging (A09):   {'DISABLED' if args.skip_logging else 'ENABLED'}")
@@ -296,8 +304,7 @@ if __name__ == "__main__":
         print(f"  - Taint Analysis:  {'DISABLED' if args.no_taint else 'ENABLED'}")
         print()
 
-    # Executar análise
-    # Lógica inversa: Se skip for True, o enable passa a ser False
+   
     found_problems = analyze_file(
         args.file, 
         enable_taint_analysis=not args.no_taint,
@@ -305,12 +312,13 @@ if __name__ == "__main__":
         enable_auth=not args.skip_auth,
         enable_logging=not args.skip_logging,
         enable_dependencies=not args.skip_dependencies,
+        enable_access_control=not args.skip_access_control,
         silent=args.json_only
     )
     
     if args.json_only:
-        # AQUI É O SEGREDO: Só imprime o JSON, nada mais, para o VS Code ler
+       
         print(json.dumps(found_problems))
     else:
-        # Modo humano (Terminal)
+        
         show_results(found_problems, verbose=True, show_low_confidence=True)

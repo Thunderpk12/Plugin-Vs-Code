@@ -343,13 +343,13 @@ class AuthenticationAnalyzer(ast.NodeVisitor):
                         # Adiciona aos encontrados para evitar duplicados se necessário
                          self.found_credentials.add(keyword.arg)
 
-        # --- FIM DA MELHORIA 1 ---
+        
 
         # Detectar uso de algoritmos fracos para hashing de passwords
-        weak_hash_functions = {'md5', 'sha1', 'sha256'}  # SHA256 sozinho é fraco para passwords
+        weak_hash_functions = {'md5', 'sha1', 'sha256'}  
         
         if any(weak in func_name.lower() for weak in weak_hash_functions):
-            # Verificar se está sendo usado para passwords
+            
             if self.current_function and any(pwd in self.current_function.lower() for pwd in {'password', 'passwd', 'pwd', 'hash'}):
                 self.problems.append(Vulnerability(
                     line=node.lineno,
@@ -380,8 +380,8 @@ class AuthenticationAnalyzer(ast.NodeVisitor):
                                 if isinstance(val, ast.Constant) and val.value is False:
                                     has_verification = False
             
-            # --- MELHORIA 2: Detetar algoritmo 'none' no JWT ---
-            # Ex: jwt.decode(..., algorithms=['none'])
+           
+            
                 if keyword.arg == 'algorithms':
                      if isinstance(keyword.value, (ast.List, ast.Tuple)):
                          for elt in keyword.value.elts:

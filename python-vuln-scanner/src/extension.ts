@@ -51,7 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // --- EVENTOS ---
+   
 
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(document => {
@@ -83,6 +83,7 @@ function runScanner(document: vscode.TextDocument, context: vscode.ExtensionCont
     const enableAuth = config.get<boolean>('analyzers.enableAuth') ?? true;
     const enableLogging = config.get<boolean>('analyzers.enableLogging') ?? true;
     const enableDependencies = config.get<boolean>('analyzers.enableDependencies') ?? true;
+    const enableAccessControl = config.get<boolean>('analyzers.enableAccessControl') ?? true;
     const enableTaint = config.get<boolean>('engine.enableTaintAnalysis') ?? true;
 
     outputChannel.appendLine(`--- Analyzing: ${filePath} ---`);
@@ -99,6 +100,7 @@ function runScanner(document: vscode.TextDocument, context: vscode.ExtensionCont
     if (!enableAuth) args += " --skip-auth";
     if (!enableLogging) args += " --skip-logging";
     if (!enableDependencies) args += " --skip-dependencies";
+    if (!enableAccessControl) args += " --skip-access-control";
     if (!enableTaint) args += " --no-taint";
 
     const command = `"${pythonExecutable}" "${scriptPath}" ${args}`;

@@ -99,7 +99,13 @@
           "default": true,
           "description": "Enable Deep Taint Analysis (Slower but more accurate)",
           "scope": "resource"
-        }
+        },
+        "pythonVulnScanner.analyzers.enableAccessControl": {
+         "type": "boolean",
+         "default": true,
+         "description": "Enable A01: Broken Access Control Analysis",
+         "scope": "resource"
+       }
       }
     }
   },
