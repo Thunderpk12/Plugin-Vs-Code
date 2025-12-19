@@ -9,7 +9,6 @@ export interface Vulnerability {
     category: string;
 }
 
-
 const CATEGORY_NAMES: { [key: string]: string } = {
     'A01': 'A01: Broken Access Control',
     'A03': 'A03: Injection',
@@ -32,18 +31,14 @@ export class SidebarProvider implements vscode.TreeDataProvider<VulnItem> {
 
     setScannerState(enabled: boolean) {
         this.isEnabled = enabled;
-        if (!enabled) {
-            this.vulnerabilities = [];
-        }
+        if (!enabled) { this.vulnerabilities = []; }
         this._onDidChangeTreeData.fire();
     }
 
-    getTreeItem(element: VulnItem): vscode.TreeItem {
-        return element;
-    }
+    getTreeItem(element: VulnItem): vscode.TreeItem { return element; }
 
     getChildren(element?: VulnItem): Thenable<VulnItem[]> {
-        // Estado: Desligado
+        // State: Paused
         if (!this.isEnabled) {
             return Promise.resolve([
                 new VulnItem("Scanner Paused", "status", vscode.TreeItemCollapsibleState.None, undefined, undefined, "Click the 'Play' button to resume analysis.")
@@ -51,7 +46,6 @@ export class SidebarProvider implements vscode.TreeDataProvider<VulnItem> {
         }
 
         if (!element) {
-            
             const categories = Array.from(new Set(this.vulnerabilities.map(v => v.category))).sort();
             
             if (categories.length === 0) {
@@ -60,14 +54,11 @@ export class SidebarProvider implements vscode.TreeDataProvider<VulnItem> {
 
             return Promise.resolve(categories.map(cat => {
                 const count = this.vulnerabilities.filter(v => v.category === cat).length;
-               
                 const fullName = CATEGORY_NAMES[cat] || cat;
                 return new VulnItem(`${fullName} (${count})`, "categoria", vscode.TreeItemCollapsibleState.Expanded);
             }));
         } else {
-           
             if (element.contextValue === "categoria") {
-                
                 const categoryCode = element.label.split(':')[0]; 
                 const filtered = this.vulnerabilities.filter(v => v.category === categoryCode);
                 
@@ -77,9 +68,9 @@ export class SidebarProvider implements vscode.TreeDataProvider<VulnItem> {
                         "item", 
                         vscode.TreeItemCollapsibleState.None,
                         { 
-                            command: 'vscode.open',
-                            title: 'Open File',
-                            arguments: [vscode.window.activeTextEditor?.document.uri, { selection: new vscode.Range(v.line - 1, 0, v.line - 1, 0) }]
+                            command: 'python-vuln-scanner.requestAiPreview',
+                            title: 'Preview AI Fix',
+                            arguments: [v] 
                         },
                         v.severity,
                         v.description,
@@ -103,50 +94,27 @@ class VulnItem extends vscode.TreeItem {
         public readonly shortDesc?: string
     ) {
         super(label, collapsibleState);
-        
         this.contextValue = type; 
         
         if (descText) {
-            this.tooltip = new vscode.MarkdownString(`**${label}**\n\n${descText}`);
-        } else {
-            this.tooltip = label;
+            this.tooltip = new vscode.MarkdownString(`**${label}**\n\n${descText}\n\n*Click to request AI Fix Preview*`);
         }
+        if (shortDesc) { this.description = shortDesc; }
 
-        if (shortDesc) {
-            this.description = shortDesc;
-        }
-        
-        
         if (type === "item") {
-            if (severity === 'HIGH') {
-                this.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('testing.iconFailed')); 
-            } else if (severity === 'MEDIUM') {
-                this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('testing.iconQueued')); 
-            } else {
-                this.iconPath = new vscode.ThemeIcon('info');
-            }
+            this.iconPath = severity === 'HIGH' ? 
+                new vscode.ThemeIcon('error', new vscode.ThemeColor('testing.iconFailed')) : 
+                new vscode.ThemeIcon('warning', new vscode.ThemeColor('testing.iconQueued'));
         } 
         else if (type === "categoria") {
             const catCode = label.split(':')[0]; 
-            
             switch (catCode) {
-                case 'A01': 
-                    this.iconPath = new vscode.ThemeIcon('lock', new vscode.ThemeColor('charts.red')); 
-                    break;
-                case 'A03': 
-                    this.iconPath = new vscode.ThemeIcon('symbol-variable', new vscode.ThemeColor('charts.red')); 
-                    break;
-                case 'A06': 
-                    this.iconPath = new vscode.ThemeIcon('package', new vscode.ThemeColor('charts.orange')); 
-                    break;
-                case 'A07': 
-                    this.iconPath = new vscode.ThemeIcon('key', new vscode.ThemeColor('charts.yellow')); 
-                    break;
-                case 'A09': 
-                    this.iconPath = new vscode.ThemeIcon('output', new vscode.ThemeColor('charts.blue')); 
-                    break;
-                default:
-                    this.iconPath = new vscode.ThemeIcon('shield'); 
+                case 'A01': this.iconPath = new vscode.ThemeIcon('lock'); break;
+                case 'A03': this.iconPath = new vscode.ThemeIcon('symbol-variable'); break;
+                case 'A06': this.iconPath = new vscode.ThemeIcon('package'); break;
+                case 'A07': this.iconPath = new vscode.ThemeIcon('key'); break;
+                case 'A09': this.iconPath = new vscode.ThemeIcon('output'); break;
+                default: this.iconPath = new vscode.ThemeIcon('shield');
             }
         }
         else if (type === "status") {

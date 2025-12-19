@@ -10,9 +10,10 @@ let sidebarProvider: SidebarProvider;
 let isScannerEnabled = true;
 
 export function activate(context: vscode.ExtensionContext) {
-    outputChannel = vscode.window.createOutputChannel("Python Vuln Scanner");
+    outputChannel = vscode.window.createOutputChannel("Python Security Scanner");
     outputChannel.appendLine("Extension starting...");
     
+    // Set initial context for UI buttons in package.json
     vscode.commands.executeCommand('setContext', 'pythonVulnScanner.enabled', true);
 
     diagnosticCollection = vscode.languages.createDiagnosticCollection('python-vuln-scanner');
@@ -21,6 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
     sidebarProvider = new SidebarProvider();
     vscode.window.registerTreeDataProvider('vuln-scanner-view', sidebarProvider);
 
+    // --- Control Commands ---
 
     context.subscriptions.push(
         vscode.commands.registerCommand('python-vuln-scanner.openSettings', () => {
@@ -51,7 +53,15 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-   
+    // --- AI Preview & Fix Command ---
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('python-vuln-scanner.requestAiPreview', async (vuln: Vulnerability) => {
+            await handleAiFixPreview(vuln, context);
+        })
+    );
+
+    // --- Workspace Events ---
 
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(document => {
@@ -72,73 +82,91 @@ export function activate(context: vscode.ExtensionContext) {
     outputChannel.appendLine("Extension loaded successfully.");
 }
 
+/**
+ * Handles AI suggestion, shows Diff Preview, and asks for confirmation.
+ */
+async function handleAiFixPreview(vuln: Vulnerability, context: vscode.ExtensionContext) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    const document = editor.document;
+    const line = document.lineAt(vuln.line - 1);
+    const indentation = line.text.substring(0, line.firstNonWhitespaceCharacterIndex);
+
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Generating AI security suggestion...",
+        cancellable: false
+    }, async () => {
+        return new Promise((resolve) => {
+            const scriptPath = path.join(context.extensionPath, 'backend', 'scanner.py');
+            const command = `python "${scriptPath}" --suggest-fix "${line.text.trim().replace(/"/g, '\\"')}" --vuln-type "${vuln.type}"`;
+
+            cp.exec(command, async (err, stdout) => {
+                if (err || !stdout.trim()) {
+                    vscode.window.showErrorMessage("AI suggestion failed. Please check if Ollama is running.");
+                    return resolve(null);
+                }
+
+                const aiSuggestion = indentation + stdout.trim();
+                const fullTextWithFix = document.getText().replace(line.text, aiSuggestion);
+                const tempUri = vscode.Uri.parse(`untitled:SECURITY_FIX_PREVIEW.py`);
+
+                // Open side-by-side Diff View
+                await vscode.commands.executeCommand('vscode.diff', 
+                    document.uri, 
+                    tempUri, 
+                    `Preview Fix: ${vuln.type}`
+                );
+
+                // Ask for user confirmation
+                const choice = await vscode.window.showInformationMessage(
+                    `Apply the suggested AI fix for "${vuln.type}"?`,
+                    "Apply Fix", "Cancel"
+                );
+
+                if (choice === "Apply Fix") {
+                    const edit = new vscode.WorkspaceEdit();
+                    edit.replace(document.uri, line.range, aiSuggestion);
+                    await vscode.workspace.applyEdit(edit);
+                    
+                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                    vscode.window.showInformationMessage("Fix applied successfully!");
+                }
+                resolve(null);
+            });
+        });
+    });
+}
+
+/**
+ * Orchestrates the Python Static Analysis (AST + Taint).
+ */
 function runScanner(document: vscode.TextDocument, context: vscode.ExtensionContext) {
     if (!isScannerEnabled) return;
 
     const scriptPath = path.join(context.extensionPath, 'backend', 'scanner.py');
-    const filePath = document.fileName;
-    
-    const config = vscode.workspace.getConfiguration('pythonVulnScanner');
-    const enableInjection = config.get<boolean>('analyzers.enableInjection') ?? true;
-    const enableAuth = config.get<boolean>('analyzers.enableAuth') ?? true;
-    const enableLogging = config.get<boolean>('analyzers.enableLogging') ?? true;
-    const enableDependencies = config.get<boolean>('analyzers.enableDependencies') ?? true;
-    const enableAccessControl = config.get<boolean>('analyzers.enableAccessControl') ?? true;
-    const enableTaint = config.get<boolean>('engine.enableTaintAnalysis') ?? true;
+    const command = `python "${scriptPath}" "${document.fileName}" --json-only`;
 
-    outputChannel.appendLine(`--- Analyzing: ${filePath} ---`);
+    outputChannel.appendLine(`--- Analyzing: ${document.fileName} ---`);
 
-    if (!fs.existsSync(scriptPath)) {
-        vscode.window.showErrorMessage(`CRITICAL ERROR: Scanner not found at: ${scriptPath}`);
-        return;
-    }
-
-    const pythonExecutable = 'python'; 
-    let args = `"${filePath}" --json-only`;
-
-    if (!enableInjection) args += " --skip-injection";
-    if (!enableAuth) args += " --skip-auth";
-    if (!enableLogging) args += " --skip-logging";
-    if (!enableDependencies) args += " --skip-dependencies";
-    if (!enableAccessControl) args += " --skip-access-control";
-    if (!enableTaint) args += " --no-taint";
-
-    const command = `"${pythonExecutable}" "${scriptPath}" ${args}`;
-
-    cp.exec(command, { cwd: path.join(context.extensionPath, 'backend') }, (err, stdout, stderr) => {
-        if (err) {
-            outputChannel.appendLine(`EXECUTION ERROR: ${err.message}`);
-            return;
-        }
+    cp.exec(command, (err, stdout) => {
+        if (err || !stdout.trim()) return;
 
         try {
-            if (!stdout.trim()) return;
-
             const vulnerabilities: Vulnerability[] = JSON.parse(stdout);
+            sidebarProvider.refresh(vulnerabilities);
             
-            if (isScannerEnabled) {
-                sidebarProvider.refresh(vulnerabilities);
-            
-                const diagnostics: vscode.Diagnostic[] = vulnerabilities.map(vuln => {
-                    const lineIndex = vuln.line > 0 ? vuln.line - 1 : 0;
-                    const range = new vscode.Range(lineIndex, 0, lineIndex, 1000);
-
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        `[${vuln.type}] ${vuln.description}`,
-                        mapSeverity(vuln.severity)
-                    );
-                    
-                    diagnostic.source = 'Python Security Scanner';
-                    diagnostic.code = vuln.category;
-                    return diagnostic;
-                });
-
-                diagnosticCollection.set(document.uri, diagnostics);
-            }
-
+            const diagnostics = vulnerabilities.map(v => {
+                const range = new vscode.Range(v.line - 1, 0, v.line - 1, 1000);
+                const diagnostic = new vscode.Diagnostic(range, `[${v.type}] ${v.description}`, mapSeverity(v.severity));
+                diagnostic.source = 'Python Security Scanner';
+                diagnostic.code = v.category;
+                return diagnostic;
+            });
+            diagnosticCollection.set(document.uri, diagnostics);
         } catch (e) {
-            outputChannel.appendLine(`JSON ERROR: ${e}`);
+            outputChannel.appendLine(`Scan Error: ${e}`);
         }
     });
 }
@@ -147,8 +175,7 @@ function mapSeverity(severity: string): vscode.DiagnosticSeverity {
     switch (severity) {
         case 'HIGH': return vscode.DiagnosticSeverity.Error;
         case 'MEDIUM': return vscode.DiagnosticSeverity.Warning;
-        case 'LOW': return vscode.DiagnosticSeverity.Information;
-        default: return vscode.DiagnosticSeverity.Hint;
+        default: return vscode.DiagnosticSeverity.Information;
     }
 }
 
